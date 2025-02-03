@@ -9,9 +9,11 @@ from pypdf import PdfReader
 
 date_regex = re.compile(r"Schlusstag\s*(\d{2}\.\d{2}\.\d{4})")
 date_time_regex = re.compile(r"Schlusstag/-Zeit\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2})")
-isin_regex = re.compile(r"(IE\w{10})")
+isin_regex = re.compile(r"((IE|US|CA|CH|GB|AU|KY)\w{10})")
 pieces_regex = re.compile(r"Stück\s*(\d+)(?:,(\d+))?")
 price_regex = re.compile(r"Ausführungskurs\s*(\d+),(\d+)\s+EUR")
+
+ignoredsymbols = [ "CH0108503795", "US3682872078", "GB00B03MLX29", "US36467W1099", "AU000000FGR3", "CA04016J1021", "IE00BYMS5W68", "CA4063721027", "KYG9830T1067" ]
 
 def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool) -> None:
     """
@@ -38,9 +40,17 @@ def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool)
             pdf = PdfReader(joined_path)
             text = pdf.pages[0].extract_text()
             trade = parse_trade_data(text)
+
+            if trade is None:
+                continue
+
             trade["type"] = trade_type
             symbol = trade["symbol"]
-            trade["symbol"] = symbol
+
+            if symbol in ignoredsymbols:
+                print(f"Skipped ignored symbol {symbol}")
+                continue
+
             for existing_trade in data["activities"]:
                 if existing_trade["date"] == trade["date"]:
                     print(f"Skipping duplicate trade on {trade['date']} to {symbol}...")
@@ -54,13 +64,20 @@ def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool)
 
 
 def parse_trade_data(text: str) -> dict[str, Any]:
-    isin = re.search(isin_regex, text).group(1)
+    isin_match = re.search(isin_regex, text)
+    if isin_match is None:
+        print(f"Skipping invalid isin")
+        return None
+    isin = isin_match.group(1)
     date_and_time = re.search(date_time_regex, text)
     if date_and_time:
         parsed_datetime = datetime.strptime(date_and_time.group(1), "%d.%m.%Y %H:%M:%S")
-    else:
+    elif re.search(date_regex, text):
         date = re.search(date_regex, text).group(1)
         parsed_datetime = datetime.strptime(date, "%d.%m.%Y")
+    else:
+        print(f"Skipped {isin} because of missing date")
+        return None
     pieces = re.search(pieces_regex, text)
     parsed_pieces = float(pieces.group(1)) + (float(f"0.{pieces.group(2)}") if pieces.group(2) else 0)
     price = re.search(price_regex, text)
