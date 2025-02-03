@@ -7,19 +7,11 @@ from typing import Any
 
 from pypdf import PdfReader
 
-from currency_converter import CurrencyConverter
-
 date_regex = re.compile(r"Schlusstag\s*(\d{2}\.\d{2}\.\d{4})")
 date_time_regex = re.compile(r"Schlusstag/-Zeit\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2})")
 isin_regex = re.compile(r"(IE\w{10})")
 pieces_regex = re.compile(r"Stück\s*(\d+)(?:,(\d+))?")
 price_regex = re.compile(r"Ausführungskurs\s*(\d+),(\d+)\s+EUR")
-
-c = CurrencyConverter()
-
-mapping = {}
-with open('mapping.json', 'r') as file:
-    mapping = json.load(file)
 
 def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool) -> None:
     """
@@ -47,7 +39,7 @@ def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool)
             text = pdf.pages[0].extract_text()
             trade = parse_trade_data(text)
             trade["type"] = trade_type
-            symbol = mapping[trade["symbol"]]
+            symbol = trade["symbol"]
             trade["symbol"] = symbol
             for existing_trade in data["activities"]:
                 if existing_trade["date"] == trade["date"]:
@@ -78,9 +70,9 @@ def parse_trade_data(text: str) -> dict[str, Any]:
         "comment": "",
         "fee": 0,
         "quantity": parsed_pieces,
-        "unitPrice": c.convert(parsed_price, 'EUR', 'USD',date=parsed_datetime),
-        "currency": "USD",
-        "dataSource": "YAHOO",
+        "unitPrice": parsed_price,
+        "currency": "EUR",
+        "dataSource": "MANUAL",
         "date": parsed_datetime.isoformat(),
         "symbol": isin,
     }
