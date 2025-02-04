@@ -13,9 +13,7 @@ isin_regex = re.compile(r"((IE|US|CA|CH|GB|AU|KY)\w{10})")
 pieces_regex = re.compile(r"Stück\s*(\d+)(?:,(\d+))?")
 price_regex = re.compile(r"Ausführungskurs\s*(\d+),(\d+)\s+EUR")
 
-ignoredsymbols = [ "CH0108503795", "US3682872078", "GB00B03MLX29", "US36467W1099", "AU000000FGR3", "CA04016J1021", "IE00BYMS5W68", "CA4063721027", "KYG9830T1067" ]
-
-def generate_dkb_trade_data(input_directory: str, output_file: str, merge: bool) -> None:
+def generate_dkb_trade_data(input_directory: str, output_file: str, ignored_symbols, merge: bool) -> None:
     """
     Extracts trade data from DKB PDFs and saves it to a JSON file.
     """
@@ -117,5 +115,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Merge with existing data",
     )
+    parser.add_argument(
+        "-s",
+        "--ignored-symbols",
+        default="ignored_symbols.json",
+        help="File containing symbols to ignore",
+    )
     args = parser.parse_args()
-    generate_dkb_trade_data(args.input_directory, args.output_file, args.merge)
+
+    ignored_symbols = []
+    with open(args.ignored_symbols, "r") as f:
+        ignoredsymbols = json.load(f)
+
+    generate_dkb_trade_data(args.input_directory, args.output_file, ignored_symbols, args.merge)
